@@ -1,6 +1,6 @@
 # Opening Roulette
 
-Practice chess openings against Stockfish — fully offline.
+Practice chess openings against Stockfish.
 
 **Live app:** https://stchkotoua.github.io/chess-opening-roulette-mobile/
 
