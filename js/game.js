@@ -220,9 +220,7 @@ async function initGame(openingData, hColor, diff) {
   // ── Init / rebuild board at starting position ────────────
   if (board) { board.destroy(); board = null; }
 
-  // Subtract 20px so chessboard.js rank/file notation labels aren't clipped.
-  // The 10px padding added to #board-wrap in CSS accounts for the other 10px.
-  const boardSize = Math.min(window.innerWidth, window.screen.width, 480) - 20;
+  const boardSize = Math.min(window.innerWidth, window.screen.width, 480) - 16;
   document.getElementById('board').style.width = boardSize + 'px';
 
   const boardConfig = {
@@ -242,6 +240,8 @@ async function initGame(openingData, hColor, diff) {
   // Re-apply width and ask chessboard.js to recalculate square sizes.
   document.getElementById('board').style.width = boardSize + 'px';
   board.resize();
+
+  requestAnimationFrame(() => renderBoardNotation(boardSize, humanColor));
 
   // ── Animate theory moves ──────────────────────────────────
   if (openingData.pgn_moves.length > 0) {
@@ -276,6 +276,8 @@ function destroyGame() {
   selectedSq = null;
   touchSelectedSq = null;
   if (board) { board.destroy(); board = null; }
+  document.getElementById('rank-labels')?.remove();
+  document.getElementById('file-labels')?.remove();
   moveList.innerHTML = '';
   const stripInner = document.getElementById('move-strip-inner');
   if (stripInner) stripInner.innerHTML = '';
@@ -750,4 +752,38 @@ function deriveResult() {
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// =========================================================
+// BOARD NOTATION
+// =========================================================
+
+function renderBoardNotation(boardSize, color) {
+  console.log('renderBoardNotation called', boardSize, color);
+  // Remove stale labels from a previous game
+  document.getElementById('rank-labels')?.remove();
+  document.getElementById('file-labels')?.remove();
+
+  document.documentElement.style.setProperty('--board-size', boardSize + 'px');
+
+  const isFlipped = (color === 'b');
+
+  const ranks = isFlipped
+    ? ['1','2','3','4','5','6','7','8']
+    : ['8','7','6','5','4','3','2','1'];
+  const files = isFlipped
+    ? ['h','g','f','e','d','c','b','a']
+    : ['a','b','c','d','e','f','g','h'];
+
+  const rankEl = document.createElement('div');
+  rankEl.id = 'rank-labels';
+  rankEl.innerHTML = ranks.map(r => `<span>${r}</span>`).join('');
+
+  const fileEl = document.createElement('div');
+  fileEl.id = 'file-labels';
+  fileEl.innerHTML = files.map(f => `<span>${f}</span>`).join('');
+
+  const wrap = document.getElementById('board-wrap');
+  wrap.appendChild(fileEl);
+  wrap.insertBefore(rankEl, wrap.firstChild);
 }

@@ -141,10 +141,10 @@ After any file change, do **both**:
 
 2. **Cache-bust game.js**: update the `?v=` query string in `index.html`:
    ```html
-   <script src="js/game.js?v=23"></script>
+   <script src="js/game.js?v=29"></script>
    ```
    The SW caches each `?v=N` as a separate entry, so bumping ensures the new
-   file is fetched and cached. Current version is `v=23`; SW cache is `v15`.
+   file is fetched and cached. Current version is `v=29`; SW cache is `v21`.
 
 ---
 

@@ -306,16 +306,18 @@ input[type=range] {
 
 .btn-new:active { border-color: var(--accent); color: var(--accent); }
 
-/* Board — full width with side padding to prevent notation clipping */
+/* Board — flex row: rank labels left, board right, file labels absolute below */
 #board-wrap {
   flex-shrink: 0;
   width: 100%;
   max-width: 100%;
-  overflow: hidden;
   background: var(--bg);
-  line-height: 0;
-  padding: 0 10px;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  position: relative;
+  padding-bottom: 18px;  /* room for absolute file labels */
 }
 
 #board {
@@ -334,6 +336,39 @@ input[type=range] {
 /* chessboard.js square colors — Lichess classic */
 #board .white-1e1d7 { background-color: #f0d9b5; }
 #board .black-3c85d { background-color: #b58863; }
+
+/* ── Hide chessboard.js built-in notation (replaced by external labels) */
+.notation-322f9 { display: none !important; }
+
+/* ── External rank / file labels ── */
+#rank-labels {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  height: var(--board-size);
+  width: 16px;
+  font-size: 10px;
+  color: #888;
+  text-align: center;
+  flex-shrink: 0;
+  line-height: 1;
+  pointer-events: none;
+}
+
+#file-labels {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  width: var(--board-size);
+  font-size: 10px;
+  color: #888;
+  margin-left: 16px;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  line-height: 1;
+  pointer-events: none;
+}
 
 /* Legal move highlights */
 .highlight-legal {
