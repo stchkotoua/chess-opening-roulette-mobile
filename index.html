@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Opening Roulette" />
+  <title>Opening Roulette</title>
+
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="favicon.ico" sizes="16x16" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+
+  <!-- chessboard.js CSS -->
+  <link rel="stylesheet"
+        href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css" />
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- ===== HOME SCREEN ===== -->
+<div id="home-screen">
+  <div class="home-card">
+
+    <div class="home-header">
+      <h1 class="logo">♟ Opening Roulette</h1>
+      <label class="theme-switch" title="Toggle theme">
+        <input type="checkbox" id="theme-toggle" />
+        <span class="theme-slider"></span>
+      </label>
+    </div>
+
+    <p class="tagline">Practice chess openings against Stockfish.</p>
+
+    <div class="controls-stack">
+
+      <div class="control-group">
+        <label for="opening-filter">Opening family</label>
+        <select id="opening-filter">
+          <option value="any">Any opening</option>
+          <option value="e4">King's Pawn (1.e4)</option>
+          <option value="d4">Queen's Pawn (1.d4)</option>
+          <option value="flank">Flank Openings</option>
+        </select>
+      </div>
+
+      <div id="name-filter-row" class="control-group name-filter-row collapsed">
+        <label for="opening-name-filter">Named opening</label>
+        <select id="opening-name-filter"></select>
+      </div>
+
+      <div class="control-group">
+        <label for="depth-filter">Theory depth</label>
+        <select id="depth-filter">
+          <option value="any">Any depth</option>
+          <option value="shallow">Shallow (≤5 moves)</option>
+          <option value="medium">Medium (6–9 moves)</option>
+          <option value="deep">Deep (10+ moves)</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>Play as</label>
+        <div id="side-selector" class="seg-group">
+          <button class="seg-btn" data-value="white">White</button>
+          <button class="seg-btn" data-value="black">Black</button>
+          <button class="seg-btn seg-active" data-value="random">Random</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label for="elo-slider">Stockfish ELO: <span id="elo-value">1500</span></label>
+        <input type="range" id="elo-slider" min="1320" max="3000" step="50" value="1500" />
+        <div class="elo-labels"><span>1320</span><span>3000</span></div>
+      </div>
+
+    </div><!-- /controls-stack -->
+
+    <button id="spin-btn" class="btn-spin">
+      <span class="spin-icon">⟳</span> New Position
+    </button>
+
+  </div><!-- /home-card -->
+</div><!-- /home-screen -->
+
+
+<!-- ===== GAME SCREEN ===== -->
+<div id="game-screen" class="hidden">
+
+  <header class="game-header">
+    <div class="opening-info">
+      <span id="eco-badge"></span>
+      <h2 id="opening-name"></h2>
+    </div>
+    <div class="header-actions">
+      <button id="new-game-btn" class="btn-new">⟳ New</button>
+      <label class="theme-switch theme-switch-sm" title="Toggle theme">
+        <input type="checkbox" id="theme-toggle-game" />
+        <span class="theme-slider"></span>
+      </label>
+    </div>
+  </header>
+
+  <!-- Board — edge-to-edge -->
+  <div id="board-wrap">
+    <div id="board"></div>
+  </div>
+
+  <!-- Status label -->
+  <div id="status-bar">Waiting…</div>
+
+  <!-- Result banner -->
+  <div id="result-banner" class="hidden"></div>
+
+  <!-- Horizontal move navigation strip -->
+  <div class="move-strip">
+    <button id="btn-back"    class="btn-nav-strip" disabled title="Back">◀</button>
+    <div class="move-strip-scroll">
+      <div id="move-strip-inner"></div>
+    </div>
+    <button id="btn-forward" class="btn-nav-strip" disabled title="Forward">▶</button>
+  </div>
+
+  <!-- Spacer pushes content above the fixed bottom bar -->
+  <div class="bottom-spacer"></div>
+
+  <!-- Fixed bottom action bar -->
+  <div class="bottom-bar">
+    <button id="btn-moves-sheet" class="bar-btn">
+      <span class="bar-icon">☰</span>
+      <span class="bar-label">Moves</span>
+    </button>
+    <button id="btn-resign" class="bar-btn hidden">
+      <span class="bar-icon">⚑</span>
+      <span class="bar-label">Resign</span>
+    </button>
+    <button id="btn-export-pgn" class="bar-btn">
+      <span class="bar-icon">↓</span>
+      <span class="bar-label">PGN</span>
+    </button>
+    <button id="btn-copy-pgn" class="bar-btn">
+      <span class="bar-icon">⎘</span>
+      <span class="bar-label">Copy</span>
+    </button>
+  </div>
+
+</div><!-- /game-screen -->
+
+
+<!-- ===== RESIGN MODAL ===== -->
+<div id="resign-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <h3 class="modal-title">Resign game?</h3>
+    <p class="modal-body">You'll be recorded as losing. This can't be undone.</p>
+    <div class="modal-buttons">
+      <button id="btn-resign-confirm" class="btn-modal-confirm">Resign</button>
+      <button id="btn-resign-cancel"  class="btn-modal-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== MOVES SHEET ===== -->
+<div id="moves-sheet-backdrop" class="sheet-backdrop hidden">
+  <div class="moves-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <span class="sheet-title">Moves</span>
+      <button id="btn-sheet-close" class="btn-sheet-close">✕</button>
+    </div>
+    <ol id="move-list"></ol>
+  </div>
+</div>
+
+
+<!-- Scripts — order matters: chess.js before openings.js, game.js before app.js -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+
+<script src="js/openings.js"></script>
+<script src="js/pgn.js"></script>
+<script src="js/game.js?v=19"></script>
+<script src="js/app.js"></script>
+
+
+</body>
+</html>
