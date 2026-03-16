@@ -114,11 +114,6 @@ const sfEngine = (() => {
   function _handle(line) {
     if (typeof line !== 'string') return;
 
-    // Log any "No such option" errors so ELO support can be verified in console
-    if (line.includes('No such option') || line.includes('Unknown command')) {
-      console.warn('[Stockfish]', line);
-    }
-
     if (line === 'uciok') {
       worker.postMessage('isready');
     }
@@ -157,9 +152,7 @@ const sfEngine = (() => {
     return new Promise(resolve => {
       _onMove = resolve;
       worker.postMessage('stop');
-      console.debug('[Stockfish] setoption name UCI_LimitStrength value true');
       worker.postMessage('setoption name UCI_LimitStrength value true');
-      console.debug(`[Stockfish] setoption name UCI_Elo value ${elo}`);
       worker.postMessage(`setoption name UCI_Elo value ${elo}`);
       worker.postMessage(`position fen ${fen}`);
       worker.postMessage('go movetime 1000');

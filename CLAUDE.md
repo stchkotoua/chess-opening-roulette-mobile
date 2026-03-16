@@ -16,8 +16,8 @@ js/app.js           Home screen logic, settings, game start, SW registration
 js/game.js          Board, move handling, history, Stockfish engine wrapper
 js/openings.js      TSV loader and opening picker (Openings namespace)
 js/pgn.js           PGN generation, clipboard copy, file export
-js/stockfish.js       Stockfish JS loader (served locally) ⚠ SEE BROKEN STATE BELOW
-js/stockfish.wasm     Stockfish WASM binary (served locally)
+js/stockfish.js     Stockfish JS loader — nmrugg v18 lite-single (served locally)
+js/stockfish.wasm   Stockfish WASM binary — 7.3 MB (served locally)
 data/a.tsv … e.tsv  ECO opening database split by first letter
 service-worker.js   Cache-first offline service worker
 manifest.json       PWA manifest — scope and start_url must match GH Pages path
@@ -35,7 +35,7 @@ img/chesspieces/wikipedia/  Local copies of 12 piece PNGs (avoids CORS)
 | jQuery | 3.7.1 | CDN |
 | chess.js | 0.10.3 | CDN |
 | chessboard.js | 1.0.0 | CDN (unpkg) |
-| Stockfish | WASM build | Served locally (⚠ broken — see below) |
+| Stockfish | v18 lite-single WASM | Served locally |
 | Piece images | Wikipedia set | Local (`img/chesspieces/wikipedia/`) |
 
 Everything else is vanilla JS (ES2017+), no frameworks, no transpilation.
@@ -79,33 +79,21 @@ produce false positives on MacBooks (trackpad registers as coarse).
 
 ## Stockfish WASM Loading
 
-Blob Workers have no base URL, so any relative path in the WASM loader fails.
-The intended workaround (currently broken — see below):
+`js/stockfish.js` is loaded as a real named Worker — `new Worker('./js/stockfish.js')`.
 
-1. Fetch `stockfish.js` as text and `stockfish.wasm` as ArrayBuffer in parallel
-2. Base64-encode the WASM bytes in 8 KB chunks (avoids call-stack overflow from
-   spreading large arrays into `String.fromCharCode` at once)
-3. Inject the WASM bytes directly into the JS source at the `wasmBinary` variable
-   declaration so the engine takes the synchronous binary path on startup
-4. Create a `Blob` from the patched source and instantiate `new Worker(blobURL)`
-5. Engine sees a truthy `wasmBinary` and never issues a fetch from inside the worker
+In Worker context, the file derives the WASM URL from `self.location.pathname`
+(replacing `.js` with `.wasm`) and fetches it directly. No base64 injection
+or Blob Worker trickery needed.
+
+`js/stockfish.wasm` supports `UCI_LimitStrength` / `UCI_Elo` and has no
+`SharedArrayBuffer` dependency (no COOP/COEP headers required).
 
 Both files are pre-cached by the service worker for offline use.
 
----
-
-## Stockfish Loading Strategy (fixed 2026-03-16)
-
-`js/stockfish.js` is the nmrugg v18 lite-single build.
-`js/stockfish.wasm` (7.3 MB) supports `UCI_LimitStrength` / `UCI_Elo` and has no `SharedArrayBuffer` dependency.
-
-**Previous broken approach**: Blob Worker + base64 injection.
-The 7.3 MB WASM produced a ~9.8 MB base64 string literal; injecting it into the
-minified source caused `SyntaxError: Unexpected token ';'`.
-
-**Current working approach**: real named Worker — `new Worker('./js/stockfish.js')`.
-In Worker context the file derives the WASM URL from `self.location.pathname`
-(replacing `.js` with `.wasm`) and fetches it directly.  No injection needed.
+**Why not a Blob Worker**: Blob Workers have no base URL, so any relative path
+in the WASM loader would fail. The previous injection approach (base64-encoding
+the 7.3 MB WASM and injecting it as a string literal) produced a ~9.8 MB
+patched source that caused `SyntaxError` at parse time.
 
 ---
 
@@ -148,15 +136,15 @@ subdirectory, not `/`.
 After any file change, do **both**:
 
 1. **Service worker cache**: increment `CACHE_NAME` in `service-worker.js`
-   (e.g. `opening-roulette-v11` → `opening-roulette-v12`). The activate handler
+   (e.g. `opening-roulette-v14` → `opening-roulette-v15`). The activate handler
    nukes all old caches so users always get fresh files.
 
 2. **Cache-bust game.js**: update the `?v=` query string in `index.html`:
    ```html
-   <script src="js/game.js?v=21"></script>
+   <script src="js/game.js?v=23"></script>
    ```
    The SW caches each `?v=N` as a separate entry, so bumping ensures the new
-   file is fetched and cached. Current version is `v=21`; SW cache is `v13`.
+   file is fetched and cached. Current version is `v=23`; SW cache is `v15`.
 
 ---
 
@@ -167,7 +155,5 @@ After any file change, do **both**:
   intercepted touchstart/touchend and broke the custom tap logic.
 - **No promotion UI** — pawn promotion always promotes to queen (`promotion: 'q'`).
 - **Single game at a time** — no session history or stats tracking.
-- **Stockfish ELO broken** — the difficulty slider is non-functional. See the
-  ⚠ Broken section above for full history and next steps.
 - **No opening search** — openings are browseable only by ECO family and named
   subset, not free-text search.
