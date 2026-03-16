@@ -77,6 +77,30 @@ produce false positives on MacBooks (trackpad registers as coarse).
 
 ---
 
+## Board Notation
+
+chessboard.js built-in rank/file labels (`.notation-322f9`) are hidden via
+`.notation-322f9 { display: none !important }` in `style.css` because they
+render inside squares and compete visually with pieces.
+
+External labels are injected by `renderBoardNotation(boardSize, color)` in
+`game.js` after each board initialisation:
+
+- `#rank-labels` — a flex column of 8 `<span>` elements, 16 px wide, inserted
+  as the first child of `#board-wrap` (to the left of the board)
+- `#file-labels` — a flex row of 8 `<span>` elements, absolutely positioned
+  at the bottom of `#board-wrap` (below the board), offset 16 px left to align
+  with the board edge
+
+`#board-wrap` uses `display: flex; flex-direction: row` so rank labels sit
+flush to the left of the board. `--board-size` is set as a CSS custom property
+via JS so both label containers can be sized to exactly match the board.
+
+Labels are orientation-aware: when playing as Black the ranks run 1→8
+(top to bottom) and files h→a (left to right).
+
+---
+
 ## Stockfish WASM Loading
 
 `js/stockfish.js` is loaded as a real named Worker — `new Worker('./js/stockfish.js')`.
@@ -141,10 +165,10 @@ After any file change, do **both**:
 
 2. **Cache-bust game.js**: update the `?v=` query string in `index.html`:
    ```html
-   <script src="js/game.js?v=29"></script>
+   <script src="js/game.js?v=30"></script>
    ```
    The SW caches each `?v=N` as a separate entry, so bumping ensures the new
-   file is fetched and cached. Current version is `v=29`; SW cache is `v21`.
+   file is fetched and cached. Current version is `v=30`; SW cache is `v22`.
 
 ---
 

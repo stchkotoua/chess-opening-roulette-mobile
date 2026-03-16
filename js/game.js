@@ -759,7 +759,6 @@ function delay(ms) {
 // =========================================================
 
 function renderBoardNotation(boardSize, color) {
-  console.log('renderBoardNotation called', boardSize, color);
   // Remove stale labels from a previous game
   document.getElementById('rank-labels')?.remove();
   document.getElementById('file-labels')?.remove();
