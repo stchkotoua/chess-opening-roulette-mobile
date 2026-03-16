@@ -18,17 +18,22 @@ Practice chess openings against Stockfish — fully offline.
 
 ## Features
 
-- Randomly picks a chess opening from ECO codes A–E
-- Filter by opening family (1.e4 / 1.d4 / flank) or named opening
-- Filter by theory depth (shallow / medium / deep)
-- Animated replay of opening theory moves before the game begins
-- Play as White, Black, or Random
-- Adjustable Stockfish ELO strength (1320–3000)
-- Tap-to-move on iOS/Android, drag-to-move on desktop
-- Full move history with click-to-navigate
-- PGN export and clipboard copy
-- Dark / light theme toggle
-- **Installable PWA — works fully offline after first load**
+- **3,641 openings** from ECO codes A–E, loaded from local TSV files
+- **4-level cascading filter**: family → named opening → variation → subvariation
+  - Family: King's Pawn (1.e4), Queen's Pawn (1.d4), English / Réti (1.c4, 1.Nf3), Flank & Irregular
+  - Named openings grouped by category with `<optgroup>` for e4 and d4
+  - Variations and subvariations derived from actual database content (≥3 entries each)
+- **Theory depth filter**: Any / Shallow (≤5 moves) / Medium (6–9) / Deep (10+)
+- **Animated theory replay** — opening moves play out before the game begins
+- **Play as White, Black, or Random**
+- **Adjustable Stockfish ELO** from 1320 to 3000
+- **Tap-to-move** on iOS/Android, **drag-to-move** on desktop
+- **Move history** with click-to-navigate (move list sheet + horizontal strip)
+- **PGN export** — download as file or copy to clipboard
+- **Resign button** with confirmation dialog
+- **Dark / light theme** toggle (persisted in localStorage)
+- **Rank and file labels** outside the board, orientation-aware (flips for Black)
+- **Installable PWA** — works fully offline after first load
 
 ## Running locally
 
