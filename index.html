@@ -42,13 +42,24 @@
           <option value="any">Any opening</option>
           <option value="e4">King's Pawn (1.e4)</option>
           <option value="d4">Queen's Pawn (1.d4)</option>
-          <option value="flank">Flank Openings</option>
+          <option value="english">English / Réti (1.c4, 1.Nf3)</option>
+          <option value="flank">Flank &amp; Irregular</option>
         </select>
       </div>
 
       <div id="name-filter-row" class="control-group name-filter-row collapsed">
         <label for="opening-name-filter">Named opening</label>
         <select id="opening-name-filter"></select>
+      </div>
+
+      <div id="variation-filter-row" class="control-group name-filter-row collapsed">
+        <label for="opening-variation-filter">Variation</label>
+        <select id="opening-variation-filter"></select>
+      </div>
+
+      <div id="subvariation-filter-row" class="control-group name-filter-row collapsed">
+        <label for="opening-subvar-filter">Subvariation</label>
+        <select id="opening-subvar-filter"></select>
       </div>
 
       <div class="control-group">
@@ -186,7 +197,7 @@
 
 <script src="js/openings.js"></script>
 <script src="js/pgn.js"></script>
-<script src="js/game.js?v=32"></script>
+<script src="js/game.js?v=38"></script>
 <script src="js/app.js"></script>
 
 

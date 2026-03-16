@@ -12,10 +12,24 @@ const Openings = (() => {
 
   // ── First-move sets for family filter ──────────────────────
   const FILTER_MOVES = {
-    e4:    new Set(['e4']),
-    d4:    new Set(['d4']),
-    flank: new Set(['c4','Nf3','g3','b3','f4','b4','Nc3','g4']),
+    e4:      new Set(['e4']),
+    d4:      new Set(['d4']),
+    english: new Set(['c4', 'Nf3']),
+    flank:   new Set(['f4','b4','g4','g3','b3','Nc3','h4','a4','f3','e3','d3','Na3','Nh3']),
   };
+
+  // ── Parse opening name into L2 / L3 / L4 hierarchy ─────────
+  // Format: "L2: L3, L4"  (colon separates L2; first comma after
+  // the colon separates L3 from L4; L4 may itself contain commas)
+  function parseName(name) {
+    const ci = name.indexOf(':');
+    if (ci === -1) return { l2: name.trim(), l3: '', l4: '' };
+    const l2   = name.slice(0, ci).trim();
+    const rest = name.slice(ci + 1).trim();
+    const cj   = rest.indexOf(',');
+    if (cj === -1) return { l2, l3: rest.trim(), l4: '' };
+    return { l2, l3: rest.slice(0, cj).trim(), l4: rest.slice(cj + 1).trim() };
+  }
 
   // ── Parse PGN text → array of SAN strings ──────────────────
   // Strips move numbers (e.g. "1.", "1...") and result tokens.
@@ -79,15 +93,18 @@ const Openings = (() => {
   // ── Public: get a random opening with filters ───────────────
   // filterKey: 'any' | 'e4' | 'd4' | 'flank'
   // depthKey:  'any' | 'shallow' | 'medium' | 'deep'
-  // openingName: substring (case-insensitive), may contain '|' for OR
-  function getRandom(filterKey = 'any', depthKey = 'any', openingName = '') {
+  // l2:  exact L2 name  (e.g. 'Sicilian Defense')
+  // l3:  exact L3 name  (e.g. 'Dragon Variation')
+  // l4:  exact L4 name  (e.g. 'Yugoslav Attack')
+  // Filters are applied as exact matches against the parsed name
+  // hierarchy, avoiding false positives from substring matching
+  // (e.g. 'Slav Defense' would not match 'Semi-Slav Defense').
+  function getRandom(filterKey = 'any', depthKey = 'any', l2 = '', l3 = '', l4 = '') {
     if (!_cache) throw new Error('Openings not loaded yet');
 
-    const byName = (pool) => {
-      if (!openingName) return pool;
-      const terms = openingName.split('|').map(t => t.trim().toLowerCase()).filter(Boolean);
-      return pool.filter(o => terms.some(t => o.name.toLowerCase().includes(t)));
-    };
+    const byL2 = pool => !l2 ? pool : pool.filter(o => parseName(o.name).l2 === l2);
+    const byL3 = pool => !l3 ? pool : pool.filter(o => parseName(o.name).l3 === l3);
+    const byL4 = pool => !l4 ? pool : pool.filter(o => parseName(o.name).l4 === l4);
 
     const byFamily = (pool) => {
       const allowed = FILTER_MOVES[filterKey];
@@ -99,18 +116,27 @@ const Openings = (() => {
     };
 
     const byDepth = (pool) => {
-      const n = pgnToSans.bind(null);
       if (depthKey === 'shallow') return pool.filter(o => pgnToSans(o.pgn).length <= 5);
       if (depthKey === 'medium')  return pool.filter(o => { const c = pgnToSans(o.pgn).length; return c >= 6 && c <= 9; });
       if (depthKey === 'deep')    return pool.filter(o => pgnToSans(o.pgn).length >= 10);
       return pool;
     };
 
-    // Pipeline: name → family → depth (with fallbacks)
+    // Pipeline: L4 → L3 → L2 → family → depth (progressive fallback)
+    // When l2 is specified, skip byFamily — the category dropdown is navigation only.
     let candidates;
-    if (openingName) {
-      candidates = byDepth(byFamily(byName(_cache)));
-      if (!candidates.length) candidates = byDepth(byFamily(_cache)); // broaden: drop name filter
+    if (l4) {
+      candidates = byDepth(byL4(byL3(byL2(_cache))));
+      if (!candidates.length) candidates = byDepth(byL3(byL2(_cache)));           // drop l4
+      if (!candidates.length) candidates = byDepth(byL2(_cache));                 // drop l3
+      if (!candidates.length) candidates = byDepth(byFamily(_cache));             // drop l2, use family
+    } else if (l3) {
+      candidates = byDepth(byL3(byL2(_cache)));
+      if (!candidates.length) candidates = byDepth(byL2(_cache));                 // drop l3
+      if (!candidates.length) candidates = byDepth(byFamily(_cache));             // drop l2, use family
+    } else if (l2) {
+      candidates = byDepth(byL2(_cache));
+      if (!candidates.length) candidates = byDepth(byFamily(_cache));             // drop l2, use family
     } else {
       candidates = byDepth(byFamily(_cache));
     }

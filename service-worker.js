@@ -5,7 +5,7 @@
 
 'use strict';
 
-const CACHE_NAME = 'opening-roulette-v24';
+const CACHE_NAME = 'opening-roulette-v30';
 
 const PIECE_NAMES = ['wP','wR','wN','wB','wQ','wK','bP','bR','bN','bB','bQ','bK'];
 
@@ -17,7 +17,7 @@ const ASSETS = [
   './css/style.css',
   './js/openings.js',
   './js/pgn.js',
-  './js/game.js?v=32',
+  './js/game.js?v=38',
   './js/app.js',
   // Stockfish — local copies (single-threaded, no SharedArrayBuffer required)
   './js/stockfish.js',
