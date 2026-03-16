@@ -5,7 +5,7 @@
 
 'use strict';
 
-const CACHE_NAME = 'opening-roulette-v10';
+const CACHE_NAME = 'opening-roulette-v11';
 
 const PIECE_NAMES = ['wP','wR','wN','wB','wQ','wK','bP','bR','bN','bB','bQ','bK'];
 
