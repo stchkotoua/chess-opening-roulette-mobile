@@ -5,7 +5,7 @@
 
 'use strict';
 
-const CACHE_NAME = 'opening-roulette-v11';
+const CACHE_NAME = 'opening-roulette-v14';
 
 const PIECE_NAMES = ['wP','wR','wN','wB','wQ','wK','bP','bR','bN','bB','bQ','bK'];
 
@@ -17,10 +17,10 @@ const ASSETS = [
   './css/style.css',
   './js/openings.js',
   './js/pgn.js',
-  './js/game.js?v=19',
+  './js/game.js?v=22',
   './js/app.js',
-  // Stockfish — local copies (stockfish.wasm.js + binary, both served locally)
-  './js/stockfish.wasm.js',
+  // Stockfish — local copies (single-threaded, no SharedArrayBuffer required)
+  './js/stockfish.js',
   './js/stockfish.wasm',
   './data/a.tsv',
   './data/b.tsv',
@@ -30,13 +30,13 @@ const ASSETS = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './favicon.ico',
+  // Piece images — local copies (avoid CORS issues)
+  ...PIECE_NAMES.map(p => `./img/chesspieces/wikipedia/${p}.png`),
   // CDN — jQuery, chess.js, chessboard.js
   'https://code.jquery.com/jquery-3.7.1.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js',
   'https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css',
   'https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js',
-  // Piece images (12 pieces)
-  ...PIECE_NAMES.map(p => `https://chessboardjs.com/img/chesspieces/wikipedia/${p}.png`),
 ];
 
 // ── Install: pre-cache everything ──────────────────────────

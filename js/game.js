@@ -99,14 +99,11 @@ document.addEventListener('keydown', e => {
 // STOCKFISH ENGINE
 // =========================================================
 
-// Stockfish is loaded by fetching both the JS loader and the WASM binary,
-// then injecting the WASM bytes directly into the Blob Worker source.
-// This sidesteps all URL-resolution problems: Blob Workers have no base URL,
-// so any relative or path-only WASM URL (e.g. "/js/stockfish.wasm") fails.
-// By pre-filling `var wasmBinary` in the source, getWasmBinaryPromise()
-// takes the synchronous path and never issues a fetch from inside the worker.
-const SF_JS   = './js/stockfish.wasm.js';
-const SF_WASM = './js/stockfish.wasm';
+// stockfish.js is loaded as a real named Worker (not a Blob Worker).
+// In Worker context, the file derives the WASM URL from self.location.pathname
+// (replacing .js with .wasm), so relative-URL resolution works without any
+// base64 injection.  Both files are pre-cached by the service worker.
+const SF_JS = './js/stockfish.js';
 
 const sfEngine = (() => {
   let worker   = null;
@@ -116,6 +113,11 @@ const sfEngine = (() => {
 
   function _handle(line) {
     if (typeof line !== 'string') return;
+
+    // Log any "No such option" errors so ELO support can be verified in console
+    if (line.includes('No such option') || line.includes('Unknown command')) {
+      console.warn('[Stockfish]', line);
+    }
 
     if (line === 'uciok') {
       worker.postMessage('isready');
@@ -135,55 +137,10 @@ const sfEngine = (() => {
     if (ready) return;
     if (worker) { worker.terminate(); worker = null; }
 
-    // Fetch JS loader and WASM binary in parallel.
-    // Both go through the service-worker cache for offline support.
-    let src, wasmBuffer;
-    try {
-      [src, wasmBuffer] = await Promise.all([
-        fetch(SF_JS).then(r => {
-          if (!r.ok) throw new Error('JS HTTP ' + r.status);
-          return r.text();
-        }),
-        fetch(SF_WASM).then(r => {
-          if (!r.ok) throw new Error('WASM HTTP ' + r.status);
-          return r.arrayBuffer();
-        }),
-      ]);
-    } catch (err) {
-      throw new Error('Failed to fetch Stockfish: ' + err.message);
-    }
-
-    // Encode WASM bytes as base64 in 8 KB chunks (avoids call-stack overflow
-    // from spreading a 558 KB array into String.fromCharCode all at once).
-    const wasmBytes = new Uint8Array(wasmBuffer);
-    const CHUNK = 8192;
-    let binary = '';
-    for (let off = 0; off < wasmBytes.length; off += CHUNK) {
-      binary += String.fromCharCode.apply(null, wasmBytes.subarray(off, off + CHUNK));
-    }
-    const wasmBase64 = btoa(binary);
-
-    // Inject the WASM bytes directly into the `var wasmBinary` declaration.
-    // When getWasmBinaryPromise() runs it sees a truthy wasmBinary and takes
-    // the synchronous getBinary() path — no fetch ever leaves the worker.
-    const DECL = 'var wasmBinary,';
-    const injected = src.replace(
-      DECL,
-      `var wasmBinary=Uint8Array.from(atob('${wasmBase64}'),c=>c.charCodeAt(0)),`
-    );
-    if (injected === src) {
-      // Declaration not found — fall back to reporting the problem clearly
-      throw new Error(
-        'Stockfish source format changed: "var wasmBinary," not found. ' +
-        'Re-download js/stockfish.wasm.js from the same CDN source.'
-      );
-    }
-
-    const blob   = new Blob([injected], { type: 'application/javascript' });
-    const blobUrl = URL.createObjectURL(blob);
-    worker = new Worker(blobUrl);
+    worker = new Worker(SF_JS);
     worker.onmessage = e => _handle(e.data);
-    worker.onerror   = e => { /* worker errors surface as init rejection */ };
+    worker.onerror   = e => console.error('[Stockfish worker error]', e);
+
     await new Promise((resolve, reject) => {
       // 20 s — WASM compilation can be slow on first run
       const t = setTimeout(
@@ -200,7 +157,9 @@ const sfEngine = (() => {
     return new Promise(resolve => {
       _onMove = resolve;
       worker.postMessage('stop');
+      console.debug('[Stockfish] setoption name UCI_LimitStrength value true');
       worker.postMessage('setoption name UCI_LimitStrength value true');
+      console.debug(`[Stockfish] setoption name UCI_Elo value ${elo}`);
       worker.postMessage(`setoption name UCI_Elo value ${elo}`);
       worker.postMessage(`position fen ${fen}`);
       worker.postMessage('go movetime 1000');
@@ -221,7 +180,7 @@ const sfEngine = (() => {
 // GAME INITIALISATION
 // =========================================================
 
-const PIECE_THEME = 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png';
+const PIECE_THEME = './img/chesspieces/wikipedia/{piece}.png';
 
 /**
  * Initialise a new game from opening data.
