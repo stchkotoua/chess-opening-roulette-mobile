@@ -220,7 +220,18 @@ async function initGame(openingData, hColor, diff) {
   // ── Init / rebuild board at starting position ────────────
   if (board) { board.destroy(); board = null; }
 
-  const boardSize = Math.min(window.innerWidth, window.screen.width, 480) - 16;
+  const availableHeight = window.innerHeight
+    - 56   // header
+    - 40   // status + move strip
+    - 60   // nav buttons
+    - 56   // bottom bar
+    - 40   // file labels + padding
+    - 20;  // safe area buffer
+  const boardSize = Math.min(
+    window.innerWidth - 28,  // width (14px rank labels each side)
+    availableHeight,
+    520
+  );
   document.getElementById('board').style.width = boardSize + 'px';
 
   const boardConfig = {
@@ -276,7 +287,7 @@ function destroyGame() {
   selectedSq = null;
   touchSelectedSq = null;
   if (board) { board.destroy(); board = null; }
-  document.getElementById('rank-labels')?.remove();
+  document.getElementById('board-notation-wrap')?.remove();
   document.getElementById('file-labels')?.remove();
   moveList.innerHTML = '';
   const stripInner = document.getElementById('move-strip-inner');
@@ -624,7 +635,9 @@ document.getElementById('board').addEventListener('touchend', function(e) {
     const move = game.move({ from, to: sq, promotion: 'q' });
 
     if (move) {
-      board.position(game.fen());
+      // Snap castling instantly — animating both king and rook causes visible lag
+      const animate = !move.flags.includes('k') && !move.flags.includes('q');
+      board.position(game.fen(), animate);
       pushMove(move.san);
       if (game.game_over()) { handleGameOver(); return; }
       setStatus('Stockfish is thinking…');
@@ -693,7 +706,10 @@ async function doEngineMove() {
   const moveResult = game.move({ from, to, promotion: prom });
   if (moveResult) pushMove(moveResult.san);
 
-  board.position(game.fen());
+  // Snap castling instantly — animating both king and rook causes visible lag
+  const animate = moveResult &&
+    !moveResult.flags.includes('k') && !moveResult.flags.includes('q');
+  board.position(game.fen(), animate);
 
   if (game.game_over()) {
     handleGameOver();
@@ -759,8 +775,8 @@ function delay(ms) {
 // =========================================================
 
 function renderBoardNotation(boardSize, color) {
-  // Remove stale labels from a previous game
-  document.getElementById('rank-labels')?.remove();
+  // Remove stale elements from a previous game
+  document.getElementById('board-notation-wrap')?.remove();
   document.getElementById('file-labels')?.remove();
 
   document.documentElement.style.setProperty('--board-size', boardSize + 'px');
@@ -774,15 +790,28 @@ function renderBoardNotation(boardSize, color) {
     ? ['h','g','f','e','d','c','b','a']
     : ['a','b','c','d','e','f','g','h'];
 
+  // Wrap #board with rank labels in a flex-row container
+  const notationWrap = document.createElement('div');
+  notationWrap.id = 'board-notation-wrap';
+
   const rankEl = document.createElement('div');
   rankEl.id = 'rank-labels';
   rankEl.innerHTML = ranks.map(r => `<span>${r}</span>`).join('');
 
+  const boardEl = document.getElementById('board');
+  const spacer = document.createElement('div');
+  spacer.id = 'rank-spacer';
+
+  notationWrap.appendChild(rankEl);
+  notationWrap.appendChild(boardEl);
+  notationWrap.appendChild(spacer);
+
+  // File labels sit below the notation wrap, indented 14px to align with board
   const fileEl = document.createElement('div');
   fileEl.id = 'file-labels';
   fileEl.innerHTML = files.map(f => `<span>${f}</span>`).join('');
 
   const wrap = document.getElementById('board-wrap');
+  wrap.appendChild(notationWrap);
   wrap.appendChild(fileEl);
-  wrap.insertBefore(rankEl, wrap.firstChild);
 }
