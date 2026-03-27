@@ -260,6 +260,7 @@ async function initGame(openingData, hColor, diff) {
     const animGame = new Chess();
     for (let i = 0; i < openingData.pgn_moves.length; i++) {
       await delay(380);
+      if (!board) return;  // destroyGame() was called (user pressed New) — bail cleanly
       animGame.move(openingData.pgn_moves[i]);
       board.position(animGame.fen(), true);
       // Highlight the current theory position in both strip and sheet list
@@ -267,6 +268,7 @@ async function initGame(openingData, hColor, diff) {
       renderMoveStrip(i);
     }
     await delay(300); // brief pause before game starts
+    if (!board) return;  // check again after the final pause
   }
 
   // ── Live chess.js at the post-theory position ────────────
@@ -287,7 +289,18 @@ function destroyGame() {
   selectedSq = null;
   touchSelectedSq = null;
   if (board) { board.destroy(); board = null; }
-  document.getElementById('board-notation-wrap')?.remove();
+
+  // renderBoardNotation() moves #board out of #board-wrap and appends it into
+  // #board-notation-wrap.  Removing that wrapper would take #board with it,
+  // leaving getElementById('board') returning null in the next initGame() call.
+  // Rescue #board back into #board-wrap first so it stays in the DOM.
+  const notationWrap = document.getElementById('board-notation-wrap');
+  if (notationWrap) {
+    const boardEl   = document.getElementById('board');
+    const boardWrap = document.getElementById('board-wrap');
+    if (boardEl && boardWrap) boardWrap.prepend(boardEl);
+    notationWrap.remove();
+  }
   document.getElementById('file-labels')?.remove();
   moveList.innerHTML = '';
   const stripInner = document.getElementById('move-strip-inner');

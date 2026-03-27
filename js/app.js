@@ -812,10 +812,18 @@ eloSlider.addEventListener('input', () => {
 // ── New Game button → back to home ───────────────────────────
 newGameBtn.addEventListener('click', showHomeScreen);
 
+// Abort flag: set true when showHomeScreen() is called so any in-flight
+// startGame() async chain knows to stop rather than re-hiding the home screen.
+let _startAborted = false;
+
 function showHomeScreen() {
+  _startAborted = true;
   destroyGame();   // defined in game.js
   gameScreen.classList.add('hidden');
   homeScreen.classList.remove('hidden');
+  // Re-enable spin button immediately — startGame() may still be awaiting
+  // and would never reach its own resetSpinBtn() call.
+  resetSpinBtn();
 }
 
 // =========================================================
@@ -825,6 +833,7 @@ function showHomeScreen() {
 spinBtn.addEventListener('click', startGame);
 
 async function startGame() {
+  _startAborted = false;
   spinBtn.disabled = true;
   spinBtn.innerHTML = '<span class="spin-icon">⟳</span> Loading…';
 
@@ -844,6 +853,10 @@ async function startGame() {
     resetSpinBtn();
     return;
   }
+
+  // "New" was pressed while ensureLoaded() was awaiting — home screen is
+  // already restored; don't touch the DOM or proceed further.
+  if (_startAborted) return;
 
   // Pick a random opening
   let data;
@@ -873,18 +886,28 @@ async function startGame() {
     try {
       await sfEngine.init();
     } catch (err) {
-      alert('Failed to load chess engine:\n' + err.message +
-            '\n\nCheck your network connection and try again.');
-      showHomeScreen();
-      resetSpinBtn();
+      if (!_startAborted) {
+        alert('Failed to load chess engine:\n' + err.message +
+              '\n\nCheck your network connection and try again.');
+        showHomeScreen();
+      }
       return;
     }
+    // "New" was pressed while the engine was initialising.
+    if (_startAborted) return;
   }
 
-  // Launch game (theory animation + hand-off)
-  await initGame(data, hColor, diff);
+  // Launch game (theory animation + hand-off).
+  // Wrapped in try-catch: if destroyGame() is called mid-animation, the
+  // animation loop returns early and initGame() exits cleanly; but as a
+  // safety net we catch any stray error so resetSpinBtn() is always reached.
+  try {
+    await initGame(data, hColor, diff);
+  } catch (_) {
+    // showHomeScreen() already restored home-screen state; nothing to do.
+  }
 
-  resetSpinBtn();
+  if (!_startAborted) resetSpinBtn();
 }
 
 function resetSpinBtn() {

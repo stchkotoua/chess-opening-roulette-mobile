@@ -25,6 +25,7 @@ Practice chess openings against Stockfish.
   - Variations and subvariations derived from actual database content (≥3 entries each)
 - **Theory depth filter**: Any / Shallow (≤5 moves) / Medium (6–9) / Deep (10+)
 - **Animated theory replay** — opening moves play out before the game begins
+- **New game at any time** — the ⟳ New button returns cleanly to the filter screen mid-replay or mid-game
 - **Play as White, Black, or Random**
 - **Adjustable Stockfish ELO** from 1320 to 3000
 - **Tap-to-move** on iOS/Android, **drag-to-move** on desktop

@@ -21,6 +21,7 @@ js/stockfish.wasm   Stockfish WASM binary — 7.3 MB (served locally)
 data/a.tsv … e.tsv  ECO opening database (3,641 entries) split by ECO letter
 service-worker.js   Cache-first offline service worker
 manifest.json       PWA manifest — scope and start_url must match GH Pages path
+favicon.ico         Browser tab icon
 icons/              icon-192.png and icon-512.png
 img/chesspieces/wikipedia/  Local copies of 12 piece PNGs (avoids CORS)
 .nojekyll           Prevents GitHub Pages from running Jekyll
@@ -105,6 +106,83 @@ selected, e.g. `⟳ New Position — Sicilian Defense: Dragon Variation`.
 
 ---
 
+## Home Screen Controls
+
+- **Play as** — segmented button (White / Black / **Random** default); selection
+  stored in `.seg-active` CSS class, read at game start.
+- **ELO slider** — range `1320–3000`, step 50, default **1500**. Drives
+  `UCI_LimitStrength` / `UCI_Elo` sent to Stockfish before each `go` command.
+- **Theory depth** — shallow (≤5 moves) / medium (6–9) / deep (10+) / any.
+  Applied inside `getRandom()` via `byDepth()`.
+- **Theme toggle** — checkbox-style toggle synced between home and game headers.
+  Persisted to `localStorage` key `"theme"` (`"light"` or absent = dark).
+  Adds/removes `light` class on `<html>` and `<body>`.
+
+---
+
+## Game Screen UI Components
+
+- **Result banner** (`#result-banner`) — shown on game over. CSS classes
+  `win` / `loss` / `draw` control colour. Hidden via `.hidden` at game start.
+- **Move strip** (`.move-strip` / `#move-strip-inner`) — horizontal scrollable
+  move history below the board. Tapping a move jumps to that position (calls
+  `stepTo(ply+1)`). Theory moves styled differently from game moves.
+- **Nav buttons** (`#btn-back` / `#btn-forward`) — step through `fenHistory`.
+  Keyboard arrow keys also trigger `stepTo` when the game screen is visible.
+- **Resign button** (`#btn-resign`) — shown only when `gameActive && !isReviewing()`.
+  Opens `#resign-modal` for confirmation. Triggers `handleResign()`.
+- **Moves sheet** (`#moves-sheet-backdrop`) — bottom slide-up sheet (CSS
+  transition on `.open` class) showing the full numbered move list (`#move-list`).
+  Tapping a move jumps to that position. Opened by the ☰ Moves bar button.
+- **Bottom bar** (`.bottom-bar`, `position: fixed`) — ☰ Moves / ⚑ Resign /
+  ↓ PGN / ⎘ Copy. PGN export also attempts clipboard copy alongside the download.
+
+---
+
+## Navigation and Game Lifecycle
+
+### `_startAborted` flag (`app.js`)
+
+`startGame()` is `async` and keeps executing after each `await` even if the user
+has navigated away with the ⟳ New button. The `_startAborted` flag coordinates
+clean cancellation across the two files:
+
+| Where | What happens |
+|---|---|
+| `showHomeScreen()` | Sets `_startAborted = true`, calls `destroyGame()`, shows home screen, **immediately calls `resetSpinBtn()`** so the button is re-enabled even if `startGame()` never reaches its own reset |
+| `startGame()` entry | Resets `_startAborted = false` **synchronously before any `await`** |
+| After `await Openings.ensureLoaded()` | `if (_startAborted) return` — home screen already shown, don't re-hide it |
+| After `await sfEngine.init()` | `if (_startAborted) return` — same reason |
+| Around `await initGame()` | Wrapped in `try-catch`; any stray error still reaches the final `resetSpinBtn()` call |
+| Final `resetSpinBtn()` | Gated: `if (!_startAborted)` — avoids a redundant second call |
+
+**Critical invariant**: the flag is reset to `false` **synchronously** at the top
+of `startGame()`. If the user presses "New" then "Spin" in quick succession, the
+second `startGame()` resets the flag before any of its `await`s, so a stale
+first-call continuation cannot produce a false-positive abort in the new flow.
+
+**`sfEngine` survives "New"**: `destroyGame()` calls `sfEngine.cancel()` (sends
+`stop`, resolves any pending `getBestMove` with `null`) but does **not** terminate
+the Worker or modify the `ready` flag. `sfEngine.isReady()` stays `true`, so the
+next `startGame()` skips `sfEngine.init()` entirely.
+
+### Animation loop guards (`game.js`)
+
+The theory animation in `initGame()` uses `await delay(380)` per move. If
+`destroyGame()` fires during a delay, `board` is set to `null`. Each delay is
+followed by a guard:
+
+```js
+await delay(380);
+if (!board) return;   // destroyGame() was called — bail cleanly
+```
+
+A matching guard follows the 300 ms post-theory pause. When `initGame()` returns
+via this path the `try-catch` in `startGame()` sees no error, and
+`if (!_startAborted) resetSpinBtn()` is skipped because the flag is still `true`.
+
+---
+
 ## Input Architecture
 
 ### Detection
@@ -137,6 +215,14 @@ produce false positives on MacBooks (trackpad registers as coarse).
   from wiping `selectedSq` between tap 1 and tap 2
 - `document.addEventListener('click', ...)` gated behind `!isTouchDevice` to
   avoid racing with touchend on iOS
+
+### iOS scroll and context-menu prevention
+
+A document-level `touchmove` listener with `{ passive: false }` calls
+`e.preventDefault()` unless the touch target is inside `#home-screen`,
+`#move-list`, or `.game-body` — preventing iOS rubber-band bounce on the
+board. A `contextmenu` listener calls `e.preventDefault()` globally to stop
+the long-press menu from appearing over chess pieces.
 
 ### Castling snap
 
@@ -183,6 +269,47 @@ board width exactly.
 Labels are orientation-aware: when playing as Black the ranks run 1→8
 (top to bottom) and files h→a (left to right).
 
+### `#board` DOM lifecycle and teardown contract
+
+`renderBoardNotation()` **physically reparents** `#board` out of `#board-wrap`
+and into the newly created `#board-notation-wrap` via `appendChild`. This happens
+inside a `requestAnimationFrame` callback — one paint frame after `initGame()`
+creates the board. The DOM therefore has two possible states at any moment:
+
+**Before rAF fires** (board just created):
+```
+#board-wrap
+  └─ #board
+```
+
+**After rAF fires** (labels injected):
+```
+#board-wrap
+  └─ #board-notation-wrap
+       ├─ #rank-labels
+       ├─ #board        ← moved here by appendChild
+       └─ #rank-spacer
+  └─ #file-labels
+```
+
+`destroyGame()` must handle both states. The teardown sequence is:
+
+1. `board.destroy()` — empties `#board`'s content; **does not remove `#board`**
+   from the DOM (chessboard.js only clears the container's innerHTML)
+2. Find `#board-notation-wrap`:
+   - If it exists → `boardWrap.prepend(boardEl)` first, **then** `notationWrap.remove()`
+   - If absent → `#board` is still in `#board-wrap`; nothing to do
+3. `#file-labels?.remove()` — always safe via optional chaining
+
+**Why this order matters**: removing `#board-notation-wrap` while `#board` is
+still inside it removes `#board` from the DOM entirely. The next `initGame()`
+call does `document.getElementById('board').style.width = ...` — which throws a
+`TypeError` on `null`, leaving a black board and "Waiting…" status indefinitely.
+
+Do not simplify `destroyGame()` to unconditionally remove both wrapper elements
+without rescuing `#board` first. This bug has been hit and fixed; the rescue
+step must be preserved.
+
 ### Board sizing
 
 ```js
@@ -213,6 +340,11 @@ or Blob Worker trickery needed.
 
 Both files are pre-cached by the service worker for offline use.
 
+**Engine pre-warm**: `app.js` fires `sfEngine.init()` via `setTimeout(..., 100)`
+immediately after the home screen paints. This starts WASM compilation in the
+background so the engine is ready by the time the user hits Spin. Errors are
+swallowed silently here; `startGame()` will retry and surface any real failure.
+
 **Why not a Blob Worker**: Blob Workers have no base URL, so any relative path
 in the WASM loader would fail. The previous injection approach (base64-encoding
 the 7.3 MB WASM and injecting it as a string literal) produced a ~9.8 MB
@@ -222,9 +354,9 @@ patched source that caused `SyntaxError` at parse time.
 
 ## Scrollable Layout
 
-`html`, `body`, and `#game-screen` all use `overflow-y: auto` with
-`-webkit-overflow-scrolling: touch` so content is accessible on smaller phones
-and in landscape orientation.
+`html`, `body`, `#home-screen`, and `#game-screen` all use `overflow-y: auto`
+with `-webkit-overflow-scrolling: touch` so content is accessible on smaller
+phones and in landscape orientation.
 
 `.bottom-bar` is `position: fixed` (always was). `#game-screen` has
 `padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px))` so content
@@ -276,9 +408,9 @@ After any file change, do **both**:
 
 2. **Cache-bust game.js**: update the `?v=` query string in `index.html`:
    ```html
-   <script src="js/game.js?v=43"></script>
+   <script src="js/game.js?v=45"></script>
    ```
-   Current version: `game.js?v=43`, SW cache: `opening-roulette-v35`.
+   Current version: `game.js?v=45`, SW cache: `opening-roulette-v37`.
 
 ---
 
